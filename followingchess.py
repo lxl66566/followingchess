@@ -1,11 +1,13 @@
 #coding=utf-8
+import imp
+from time import sleep
 import pygame
 import numpy as np
 from sys import exit
 from pygame.locals import *
 from math import floor,pi
-from time import sleep
-import asyncio
+import time
+# import asyncio
 
 _size_of_n = (6,30)
 _base_size = 40                            #显示方格边长
@@ -13,17 +15,25 @@ _size_of_circle = (20,_base_size - 2)     #circle大小
 direction = 0                               #风向
 step = 0                                    #步数
 biggest = 1                                 #当前格内最多
+_normal_distribution = []                   #动画移动比例表
+_FPS = 2                                    #决定正态分布移动步长.
+_asleep = 0.05                               #动画帧间隔
 _BLUE = (80,186,225)
 _ORANGE = (255,111,84)
 
 def relativepos_to_absolutepos(x,y) -> list:
     return [(x + 0.5) * _base_size,(y + 0.5) * _base_size]
 
-def linear(x,y) -> list:
-    temp = []
-    for i in range(x - y,0,2):  #步长 =!= fps
-        temp.append(round((lambda x: np.exp(-0.5 * x * x) / np.sqrt(2 * pi)) (i)))  #正态分布动画
-    return temp
+def make_normal_list():
+    for i in range(-350,0,_FPS): # i / 100
+        _normal_distribution.append((lambda x: np.exp(-0.5 * x * x)) (i / 100))
+    _normal_distribution.append(1)
+
+# def linear(x,y):
+#     temp = []
+#     for i in _normal_distribution:
+#         temp.append(round(i * (y - x) + x)) #正态分布动画
+#     return temp
 
 class circle:
     def __init__(self,pos:list,color,numb = 1) -> None:
@@ -32,15 +42,19 @@ class circle:
         self.color = color
         self.numb = numb
         self.update_radium()
-        self.update_rect()
+        # self.update_rect()
         self.draw_me_relativepos()
+        self.moving_step = len(_normal_distribution)        # len...,非移动中 0~n,移动第n步
+        self.old_pos = []
+        self.new_pos = []
 
-    def update_rect(self) -> pygame.Rect:
-        self.rect = pygame.Rect(self.apos[0] - self.radium,self.apos[1] - self.radium,self.apos[0] + self.radium,self.apos[1] + self.radium)
-        return self.rect
+    # def update_rect(self) -> pygame.Rect:
+    #     self.rect = pygame.Rect(self.apos[0] - self.radium,self.apos[1] - self.radium,self.apos[0] + self.radium,self.apos[1] + self.radium)
+    #     return self.rect
 
     def update_radium(self):
         self.radium = (self.numb / biggest) * (_size_of_circle[1] - _size_of_circle[0]) + _size_of_circle[0]
+        self.radium /= 2
 
     def draw_me_relativepos(self):
         self.apos = relativepos_to_absolutepos(*self.pos)
@@ -48,35 +62,52 @@ class circle:
     
     def draw_me_absolutepos(self):
         pygame.draw.circle(screen,self.color,self.apos,self.radium)
-        pygame.display.update(self.update_rect())
+        # pygame.display.update(self.update_rect())       #新位置自动更新
 
-    def move_draw(self,to_pos:list):
-        xy = 0
-        if self.pos[0] == to_pos[0]:                    #y向移动
-            xy = 1
-        elif self.pos[1] == to_pos[1]:                  #x向移动
-            xy = 0
-        temp = linear(self.pos[xy],to_pos[xy])
-        for i in temp:
-            self.apos[xy] = i
-            oldrect = self.rect
-            self.draw_me_absolutepos()
-            pygame.display.update(oldrect)
-            asyncio.sleep(0.1)
-        self.pos = to_pos
-        return True
+def move_circle_a_step(c:circle):
+    xy = 0
+    if c.old_pos[0] == c.new_pos[0]:                    #y向移动
+        xy = 1
+    c.apos[xy] = round(_normal_distribution[c.moving_step] * (c.new_pos[xy] - c.old_pos[xy]) + c.old_pos[xy])
+    c.draw_me_absolutepos()
 
-async def mainprocess():
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            await test.move_draw([1,9])
-    pygame.display.update()
+def move_circles(list_of_circle:list):
+    stop = 1
+    t0 = time.process_time()
+    while stop:
+        if(time.process_time() - t0 < _asleep):
+            continue
+        else:
+            t0 = time.process_time()
+        stop = 0
+        for c in list_of_circle:
+            if c.moving_step == len(_normal_distribution):
+                continue
+            stop = 1
+            move_circle_a_step(c)
+            c.moving_step += 1
+        
+        # asyncio.sleep(_asleep)
 
+
+# def move_draw(self,to_pos:list):
+#     xy = 0
+#     if self.pos[0] == to_pos[0]:                    #y向移动
+#         xy = 1
+#     elif self.pos[1] == to_pos[1]:                  #x向移动
+#         xy = 0
+#     temp = linear(self.pos[xy],to_pos[xy])
+#     for i in temp:
+#         self.apos[xy] = i
+#         oldrect = self.rect
+#         self.draw_me_absolutepos()
+#         pygame.display.update(oldrect)
+#     self.pos = to_pos
+#     return True
 
 if __name__ == '__main__':
+
+    make_normal_list()
 
     while True:
         try:
@@ -95,8 +126,18 @@ if __name__ == '__main__':
     screen.fill((255,255,255))
     pygame.display.set_caption('followingchess_ made by |x|')
 
-
     test = circle([1,1],_BLUE,1)
-    print(type(test.apos))
+
     while True:
-        asyncio.run(mainprocess()) 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+
+                test.old_pos = relativepos_to_absolutepos(1,1)
+                test.new_pos = relativepos_to_absolutepos(1,6)
+                test.moving_step = 0
+                move_circles([test])
+
+        pygame.display.update()
