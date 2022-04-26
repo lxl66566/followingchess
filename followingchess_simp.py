@@ -4,8 +4,9 @@ from sys import exit
 from math import floor,sqrt,atan,tan,pi,sin,cos,ceil
 from copy import deepcopy
 from random import randint
+import os,json
 
-VERSION = 'v1.0.0'
+VERSION = 'v1.1.0'
 BLUE = (80,186,225)
 ORANGE = (255,111,84)
 WHITE = (255,255,255)
@@ -20,7 +21,7 @@ WINDDIR = ((0,-1),(0,1),(-1,0),(1,0))
 WINDLEVEL = [1,4]
 def update_windlevel():
     global WINDLEVEL
-    WINDLEVEL[1] = max(1,ceil(min(sqrt(max(1,chess_num - 6)) , n / 6.2)))#计算level随机上限
+    WINDLEVEL[1] = max(1,ceil(min(sqrt(max(1,chess_num - 5 - biggest)) , n / 6.2)))#计算level随机上限
 VICTORY:int     #一方超过另一方多少个子就算胜利
 def get_victory():
     global VICTORY
@@ -85,7 +86,7 @@ def draw_arrow(screen,beginpos,endpos,length = 9,color = BLACK):                
     seita2 = atan(k) - pi/6
     pos1 = [endpos[0] + cos(seita1) * length , endpos[1] + sin(seita1) * length]
     pos2 = [endpos[0] + cos(seita2) * length , endpos[1] + sin(seita2) * length]
-    if endpos[0] > beginpos[0] and endpos[1] >= beginpos[1]:
+    if endpos[0] > beginpos[0]:
         pos1 = [endpos[0] - cos(seita1) * length , endpos[1] - sin(seita1) * length]
         pos2 = [endpos[0] - cos(seita2) * length , endpos[1] - sin(seita2) * length]
     pygame.draw.line(screen,color,pos1,endpos,width_of_line)
@@ -182,11 +183,16 @@ def draw(screen):
                 continue
             j[0].update_rad()
             j[0].draw_me(screen)
-    myfont2 = pygame.font.Font(None,floor(RADIUM_RATE[1] * 0.8 * STANDARD_LENGTH))
+    myfont2 = pygame.font.Font(None,floor(RADIUM_RATE[1] * 0.8 * STANDARD_LENGTH))  #大
     text_pos = deepcopy(orange.pos)
     text_pos[0] += orange.rad + STANDARD_LENGTH * 0.8 * n / SIZE[1]
     text_pos[1] -= STANDARD_LENGTH * 0.2
     textImage = myfont2.render(f'blow:       level:{level}',True,BLACK)
+    screen.blit(textImage,text_pos)
+
+    myfont2 = pygame.font.Font(None,floor(RADIUM_RATE[1] * 0.5 * STANDARD_LENGTH))  #小
+    text_pos[1] -= STANDARD_LENGTH * 0.3
+    textImage = myfont2.render('next',True,BLACK)
     screen.blit(textImage,text_pos)
 
     if blow < 4:
@@ -200,13 +206,14 @@ def draw(screen):
                   18 * STANDARD_LENGTH / 40,(255,0,0))
 
     text_pos = deepcopy(blue.pos)
-    myfont2 = pygame.font.Font(None,floor(RADIUM_RATE[1] * 0.5 * STANDARD_LENGTH))
     text_pos[1] += blue.rad + floor(0.15 * STANDARD_LENGTH)
     textImage = myfont2.render(f'vic-condition:{VICTORY}',True,BLACK)
     screen.blit(textImage,text_pos)
 
 
 if __name__ == "__main__":
+    with open(os.path.dirname(__file__) + os.sep + 'settings.json',encoding='utf-8') as f:
+        settingdic = json.load(f)
     while True:
         try:
             n = int(input(f'请输入一个[{SIZE[0]},{SIZE[1]}]内的正整数表示棋盘大小：'))
@@ -220,11 +227,12 @@ if __name__ == "__main__":
     print(f'''
 这里是 逐流棋 | {VERSION} 的规则：
 游戏分为蓝方与橙方，交替下棋。当场上棋子数 >= {WINDSTART} 时开始流动，流动的方向与等级均随机。
-棋子流动的规则是向指定方向流动 x 格，若流出边界则该棋子立刻失去联络。
+棋子流动的规则是向指定方向流动 x 格(至少一格)，若流出边界则该棋子立刻失去联络。
 x = level + 四周敌方棋子数 - 四周我方棋子数 - 当前格棋子数 + 1
 当友方棋子流动到同一格时，数量叠加
 当双方棋子流动到同一格时，多的吃少的（数量相等则湮灭）
 胜利条件为双方棋子数量之差 >= 某一数值(vic-condition)
+若要修改一些设置，请前往 README.txt 依照说明修改
     ''')
 
     WINDOWSIZE = [n * STANDARD_LENGTH , (n + 2) * STANDARD_LENGTH]
@@ -271,28 +279,28 @@ x = level + 四周敌方棋子数 - 四周我方棋子数 - 当前格棋子数 +
                     update_chess_num()
                     victory(screen)
 
+                    if chess_num == WINDSTART - 2 and not round:#4个棋,橙方落子后更新
+                        blow = randint(0,3)
+                        update_windlevel()
+                        level = randint(*WINDLEVEL)
+
                     round = not round
 
-                    if chess_num < WINDSTART:#起风！
+                    if chess_num < WINDSTART:#不起风！
                         screen.fill(WHITE)  #切换当前回合玩家
                         draw(screen)
                         break
 
-                    if not round:       #半回合，不吹风
-                        blow = 4
-                        level = 0
+                    if not round:       #蓝方落子，不吹风
                         screen.fill(WHITE)
                         draw(screen)
                         break
 
                     next = 1
-                    blow = randint(0,3)
-                    update_windlevel()
-                    level = randint(*WINDLEVEL)
                     screen.fill(WHITE)
                     draw(screen)
 
-                    for i in range(n):
+                    for i in range(n):#检测新位置
                         for j in range(n):
                             if game[i][j] == []:
                                 continue
@@ -303,7 +311,7 @@ x = level + 四周敌方棋子数 - 四周我方棋子数 - 当前格棋子数 +
                                 try:
                                     if game[i + dir[0]][j + dir[1]] == []:
                                         continue
-                                    if game[i + dir[0]][j + dir[1]][0].color == color:
+                                    if game[i + dir[0]][j + dir[1]][0].color is game[i][j][0].color:
                                         step -= game[i + dir[0]][j + dir[1]][0].num
                                     else:
                                         step += game[i + dir[0]][j + dir[1]][0].num
@@ -314,7 +322,12 @@ x = level + 四周敌方棋子数 - 四周我方棋子数 - 当前格棋子数 +
                                 step = 1
                             new_pos = (game[i][j][0].pos[0] + step * WINDDIR[blow][0] , 
                                         game[i][j][0].pos[1] + step * WINDDIR[blow][1])
-                            draw_arrow(screen,posmap(game[i][j][0].pos), posmap(new_pos) ,color = game[i][j][0].color)
+                            deal_pos = list(posmap(new_pos))
+                            if settingdic["randomarrows"] != 0:
+                                fence = ceil(STANDARD_LENGTH * RADIUM_RATE[1] * 0.27)
+                                for k in range(2):
+                                    deal_pos[k] += randint(-fence,fence)
+                            draw_arrow(screen,posmap(game[i][j][0].pos), deal_pos ,color = game[i][j][0].color)
                             game[i][j][0].new_pos = new_pos
                     
                     for i in range(n):#移动
@@ -354,8 +367,10 @@ x = level + 四周敌方棋子数 - 四周我方棋子数 - 当前格棋子数 +
                                             
 
                 elif next == 1:                         #下个回合
-                    level = 0
-                    blow = 4
+                    blow = randint(0,3)
+                    update_windlevel()
+                    level = randint(*WINDLEVEL)
+                    
                     screen.fill(WHITE)
                     draw(screen)
                     next = 0
