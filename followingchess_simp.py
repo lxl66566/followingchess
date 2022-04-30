@@ -212,8 +212,13 @@ def draw(screen):
 
 
 if __name__ == "__main__":
-    with open(os.path.dirname(__file__) + os.sep + 'settings.json',encoding='utf-8') as f:
-        settingdic = json.load(f)
+    try:
+        with open(os.path.dirname(__file__) + os.sep + 'settings.json','r',encoding='utf-8') as f:
+            settingdic = json.load(f)
+    except FileNotFoundError:
+        settingdic = {"randomarrows" : 1}
+        with open(os.path.dirname(__file__) + os.sep + 'settings.json','w',encoding='utf-8') as f:
+            json.dump(settingdic,f,indent=4)
     while True:
         try:
             n = int(input(f'请输入一个[{SIZE[0]},{SIZE[1]}]内的正整数表示棋盘大小：'))
